@@ -1,0 +1,124 @@
+# This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0/
+
+# Reusable Build-And-Test job: check out the consumer repository with full
+# history and tags, run its make-based build and test targets, optionally
+# from an unpacked dist tarball, and upload artifacts.
+# Differences between consumers become `with:` arguments, because workflow
+# level env of the caller does not reach called workflows.
+# e.g. uses: tim-janik/release-kit/.github/workflows/build-and-test.yml@trunk
+#      with: { make-targets: 'distcheck', artifact-name: Example-Artifacts }
+
+name: Build-And-Test
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:           # runner image, e.g. ubuntu-24.04
+        default: ubuntu-latest
+        type: string
+      container:         # job container as JSON, e.g. '{ "image": "...", "options": "--user runner" }'
+        default: ''
+        type: string
+      submodules:        # checkout submodules: '' or 'recursive'
+        default: ''
+        type: string
+      apt-packages:      # space separated packages for apt-get install
+        default: ''
+        type: string
+      go-version-file:   # enables actions/setup-go with this file, e.g. go.mod
+        default: ''
+        type: string
+      setup:             # shell snippet run before the make targets
+        default: ''
+        type: string
+      make-targets:      # one make invocation per line, a 'sudo' word runs under sudo
+        required: true
+        type: string
+      make-env:          # KEY=VALUE lines exported for the make invocations
+        default: ''
+        type: string
+      tarball-path:      # dist tarball glob, unpacked into tarball-dir when set
+        default: ''
+        type: string
+      tarball-dir:       # unpack directory, e.g. /tmp/example
+        default: ''
+        type: string
+      tarball-targets:   # make lines run inside tarball-dir
+        default: ''
+        type: string
+      post:              # shell snippet run after the make targets
+        default: ''
+        type: string
+      artifact-name:     # uploaded from artifact-path at the end of the job
+        default: ''
+        type: string
+      artifact-path:
+        default: artifacts/
+        type: string
+      artifact2-name:    # second upload slot
+        default: ''
+        type: string
+      artifact2-path:
+        default: ''
+        type: string
+
+jobs:
+  Build-And-Test:
+    runs-on: ${{ inputs.runs-on }}
+    container: ${{ inputs.container != '' && fromJSON(inputs.container) || null }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+        submodules: ${{ inputs.submodules || false }}
+    - run: git fetch --force --tags     # Fix actions/checkout#290
+    - uses: actions/setup-go@v5
+      if: inputs.go-version-file != ''
+      with: { go-version-file: '${{ inputs.go-version-file }}' }
+    - name: Apt-Packages
+      if: inputs.apt-packages != ''
+      run: |
+        sudo apt-get update
+        # shellcheck disable=SC2086  # input carries a word list
+        sudo TZ=Etc/UTC DEBIAN_FRONTEND=noninteractive apt-get install -y ${{ inputs.apt-packages }}
+    - name: Setup
+      if: inputs.setup != ''
+      run: ${{ inputs.setup }}
+    - name: Build-And-Test
+      env:
+        KIT_MAKE_ENV: '${{ inputs.make-env }}'
+        KIT_MAKE_TARGETS: '${{ inputs.make-targets }}'
+        KIT_TARBALL_PATH: '${{ inputs.tarball-path }}'
+        KIT_TARBALL_DIR: '${{ inputs.tarball-dir }}'
+        KIT_TARBALL_TARGETS: '${{ inputs.tarball-targets }}'
+      run: |
+        while IFS= read -r kv; do
+          [[ -z $kv ]] || export "${kv?}"
+        done <<< "$KIT_MAKE_ENV"
+        run_make() {  # one make invocation; a 'sudo' word among the arguments runs make under sudo
+          local sudo='' a args=()
+          for a in "$@"; do
+            if [[ $a == sudo ]]; then sudo=sudo; else args+=("$a"); fi
+          done
+          $sudo make -w "${args[@]}"
+        }
+        # shellcheck disable=SC2086  # each line carries the make arguments
+        while IFS= read -r line; do [[ -n $line ]] && run_make $line; done <<< "$KIT_MAKE_TARGETS"
+        if [[ -n $KIT_TARBALL_PATH ]]; then
+          [[ -n $KIT_TARBALL_DIR ]] || { echo 'Build-And-Test: tarball-dir is required with tarball-path' >&2; exit 1; }
+          mkdir -p "$KIT_TARBALL_DIR"
+          # shellcheck disable=SC2086  # the path may be a glob
+          tar -xf $KIT_TARBALL_PATH -C "$KIT_TARBALL_DIR" --strip-components=1
+          # shellcheck disable=SC2086  # each line carries the make arguments
+          while IFS= read -r line; do [[ -n $line ]] && run_make -C "$KIT_TARBALL_DIR" $line; done <<< "$KIT_TARBALL_TARGETS"
+        fi
+    - name: Post
+      if: inputs.post != ''
+      run: ${{ inputs.post }}
+    - uses: actions/upload-artifact@v7
+      if: inputs.artifact-name != '' && !cancelled()
+      with: { name: '${{ inputs.artifact-name }}', path: '${{ inputs.artifact-path }}' }
+    - uses: actions/upload-artifact@v7
+      if: inputs.artifact2-name != '' && !cancelled()
+      with: { name: '${{ inputs.artifact2-name }}', path: '${{ inputs.artifact2-path }}' }
