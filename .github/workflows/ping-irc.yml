@@ -1,0 +1,37 @@
+# This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0/
+
+# Reusable Ping-IRC job: consumers call it with the joined needs results,
+# e.g. uses: tim-janik/release-kit/.github/workflows/ping-irc.yml@trunk
+#      with: { jobs: "${{ join(needs.*.result, ' ') }}" }
+# No secrets are needed; the GITHUB_TOKEN default (contents: read) suffices.
+
+name: Ping-IRC
+
+on:
+  workflow_call:
+    inputs:
+      jobs:                # e.g. join(needs.*.result) of the caller
+        required: true
+        type: string
+      server:
+        default: irc.libera.chat:6697
+        type: string
+      channel:
+        default: '#Anklang'
+        type: string
+
+jobs:
+  Ping-IRC:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        repository: tim-janik/release-kit
+        ref: ${{ github.action_ref || 'trunk' }}  # match the caller's pin
+        persist-credentials: false
+    - name: Ping-IRC
+      continue-on-error: true
+      if: ${{ !env.ACT }}
+      env:                                        # IRCBOT_JOBS indicates 'success'
+        IRCBOT_JOBS: ${{ inputs.jobs }}
+      run: ./ircbot.py -s "${{ inputs.server }}" -G "${{ inputs.channel }}"
