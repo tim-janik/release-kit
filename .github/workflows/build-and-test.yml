@@ -4,7 +4,8 @@
 # history and tags, run its make-based build and test targets, optionally
 # from an unpacked dist tarball, and upload artifacts.
 # Differences between consumers become `with:` arguments, because workflow
-# level env of the caller does not reach called workflows.
+# level env of the caller does not reach called workflows. Container images
+# need to provide bash, git and make.
 # e.g. uses: tim-janik/release-kit/.github/workflows/build-and-test.yml@trunk
 #      with: { make-targets: 'distcheck', artifact-name: Example-Artifacts }
 
@@ -72,20 +73,27 @@ jobs:
         fetch-depth: 0
         fetch-tags: true
         submodules: ${{ inputs.submodules || false }}
-    - run: git fetch --force --tags     # Fix actions/checkout#290
+    - name: Fetch-Tags
+      shell: bash
+      run: |
+        git config --global --add safe.directory "$GITHUB_WORKSPACE" || true  # container ownership
+        git fetch --force --tags     # Fix actions/checkout#290
     - uses: actions/setup-go@v5
       if: inputs.go-version-file != ''
       with: { go-version-file: '${{ inputs.go-version-file }}' }
     - name: Apt-Packages
       if: inputs.apt-packages != ''
+      shell: bash
       run: |
         sudo apt-get update
         # shellcheck disable=SC2086  # input carries a word list
         sudo TZ=Etc/UTC DEBIAN_FRONTEND=noninteractive apt-get install -y ${{ inputs.apt-packages }}
     - name: Setup
       if: inputs.setup != ''
+      shell: bash
       run: ${{ inputs.setup }}
     - name: Build-And-Test
+      shell: bash
       env:
         KIT_MAKE_ENV: '${{ inputs.make-env }}'
         KIT_MAKE_TARGETS: '${{ inputs.make-targets }}'
@@ -115,6 +123,7 @@ jobs:
         fi
     - name: Post
       if: inputs.post != ''
+      shell: bash
       run: ${{ inputs.post }}
     - uses: actions/upload-artifact@v7
       if: inputs.artifact-name != '' && !cancelled()

@@ -59,7 +59,8 @@ shell substitution. Because caller workflow env does not reach called
 workflows, differences become arguments: `make-env` exports `KEY=VALUE`
 lines, `setup` and `post` run shell snippets, `apt-packages`,
 `go-version-file`, `container` (a JSON mapping) and `submodules` configure
-the environment. Consumers with mid-job ccache steps (anklang) keep a local
+the environment. Container images must provide bash, git and make.
+Consumers with mid-job ccache steps (anklang) keep a local
 job until the kit grows cache support.
 
 ## Development
