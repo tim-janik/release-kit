@@ -16,3 +16,31 @@ jobs:
     steps:
     - { uses: actions/checkout@v7 }
     - run: python3 test_ircbot.py
+    - name: Lint-Workflows
+      run: |
+        bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        ./actionlint -ignore 'property "workflow_(repository|sha)" is not defined'
+
+  Self-Test:
+    # Exercise the reusable Build-And-Test workflow on the kit itself
+    uses: ./.github/workflows/build-and-test.yml
+    with:
+      make-targets: check
+      setup: |
+        mkdir -p kit-test/.github/workflows artifacts
+        cp LICENSE Makefile ircbot.py test_ircbot.py kit-test/
+        cp .github/workflows/ping-irc.yml kit-test/.github/workflows/
+        tar -cf artifacts/kit-test.tar kit-test
+      tarball-path: artifacts/*.tar
+      tarball-dir: /tmp/kit-tarball
+      tarball-targets: check
+      post: echo 'kit Build-And-Test self-test'
+      artifact-name: Kit-SelfTest
+      artifact-path: LICENSE
+
+  Self-Test-Container:
+    # buildpack-deps ships make and git, but no python3, hence make --version
+    uses: ./.github/workflows/build-and-test.yml
+    with:
+      container: '{ "image": "buildpack-deps:bookworm" }'
+      make-targets: '--version'
