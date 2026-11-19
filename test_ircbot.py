@@ -531,6 +531,19 @@ def preview ():
     print (name + ': ' + bot.ansi_message (bot.format_message (args)))
 
 
+class WorkflowTests (unittest.TestCase):
+  workflow = Path (__file__).parent / '.github/workflows/ping-irc.yml'
+
+  def test_checkout_pins_the_reusable_workflow_source (self):
+    # github.action_ref is unusable here: it resolves to the current step's
+    # action ref, e.g. 'v7' for actions/checkout, breaking the checkout.
+    code = '\n'.join (line.partition ('#')[0] for line in
+                      self.workflow.read_text (encoding = 'utf8').splitlines())
+    self.assertNotIn ('github.action_ref', code)
+    self.assertIn ("ref: ${{ job.workflow_sha || 'trunk' }}", code)
+    self.assertIn ("repository: ${{ job.workflow_repository || 'tim-janik/release-kit' }}", code)
+
+
 if __name__ == '__main__':
   if '--preview' in sys.argv:
     preview ()

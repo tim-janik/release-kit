@@ -26,8 +26,10 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        repository: tim-janik/release-kit
-        ref: ${{ github.action_ref || 'trunk' }}  # match the caller's pin
+        # job.workflow_* identifies this reusable workflow's own source;
+        # github.action_ref would resolve to actions/checkout's ref instead.
+        repository: ${{ job.workflow_repository || 'tim-janik/release-kit' }}
+        ref: ${{ job.workflow_sha || 'trunk' }}  # match the caller's pin
         persist-credentials: false
     - name: Ping-IRC
       continue-on-error: true
