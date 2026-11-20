@@ -16,3 +16,9 @@ jobs:
     steps:
     - { uses: actions/checkout@v7 }
     - run: python3 test_ircbot.py
+    - name: Actionlint
+      run: |
+        mkdir -p tmp
+        curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash | bash -s -- 1.7.12 tmp
+        # actionlint 1.7.12 lacks the documented job.workflow_* properties (rhysd/actionlint#667)
+        tmp/actionlint -color -ignore 'property "workflow_(sha|repository)" is not defined'
