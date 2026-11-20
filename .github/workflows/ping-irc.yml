@@ -2,7 +2,9 @@
 
 # Reusable Ping-IRC job: consumers call it with the joined needs results,
 # e.g. uses: tim-janik/release-kit/.github/workflows/ping-irc.yml@trunk
-#      with: { jobs: "${{ join(needs.*.result, ' ') }}" }
+#      with: { jobs: "${{ join(needs.*.result, ' ') }}", title: 'Distcheck' }
+#      (title announces "<title> <git describe --always> - <run URL>", which
+#      serves scheduled runs that carry no push payload of their own).
 # No secrets are needed; the GITHUB_TOKEN default (contents: read) suffices.
 
 name: Ping-IRC
@@ -19,6 +21,9 @@ on:
       channel:
         default: '#Anklang'
         type: string
+      title:               # e.g. 'Distcheck': "<title> <git describe> - <run URL>"
+        default: ''
+        type: string
 
 jobs:
   Ping-IRC:
@@ -31,9 +36,29 @@ jobs:
         repository: ${{ job.workflow_repository || 'tim-janik/release-kit' }}
         ref: ${{ job.workflow_sha || 'trunk' }}  # match the caller's pin
         persist-credentials: false
+    - uses: actions/checkout@v7
+      if: ${{ inputs.title != '' }}  # git describe needs the caller's history
+      with:
+        repository: ${{ github.repository }}  # inside workflow_call: the caller's
+        ref: ${{ github.sha }}
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+        path: caller-repo
     - name: Ping-IRC
       continue-on-error: true
       if: ${{ !env.ACT }}
       env:                                        # IRCBOT_JOBS indicates 'success'
         IRCBOT_JOBS: ${{ inputs.jobs }}
-      run: ./ircbot.py -s "${{ inputs.server }}" -G "${{ inputs.channel }}"
+        IRCBOT_SERVER: ${{ inputs.server }}
+        IRCBOT_CHANNEL: ${{ inputs.channel }}
+        IRCBOT_TITLE: ${{ inputs.title }}
+      run: |
+        args=(-s "$IRCBOT_SERVER" -G "$IRCBOT_CHANNEL")
+        if test -n "$IRCBOT_TITLE"; then
+          git -C caller-repo fetch --force --tags     # Fix actions/checkout#290
+          describe="$(git -C caller-repo describe --always)"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          args+=(-D "$GITHUB_REF_NAME" "$IRCBOT_TITLE $describe - $url")
+        fi
+        ./ircbot.py "${args[@]}"

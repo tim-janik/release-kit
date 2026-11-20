@@ -24,6 +24,19 @@ Announce CI results from any repository:
     with: { jobs: "${{ join(needs.*.result, ' ') }}" }   # no secrets: inherit
 ```
 
+Scheduled (nightly) runs carry no push payload, so they pass a `title` and
+get "<title> <git describe --always> - <run URL>" announced; the kit checks
+out the caller repository just to run `git describe`:
+
+```yaml
+  Ping-IRC:
+    # schedule: cron '42 3 * * *', needs: [ Distcheck ]
+    uses: tim-janik/release-kit/.github/workflows/ping-irc.yml@trunk
+    with:
+      jobs: "${{ join(needs.*.result, ' ') }}"
+      title: 'Distcheck'
+```
+
 ## Development
 
 Change the kit first, run `python3 test_ircbot.py`, push. The kit's CI runs

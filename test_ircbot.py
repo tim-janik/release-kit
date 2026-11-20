@@ -543,6 +543,21 @@ class WorkflowTests (unittest.TestCase):
     self.assertIn ("ref: ${{ job.workflow_sha || 'trunk' }}", code)
     self.assertIn ("repository: ${{ job.workflow_repository || 'tim-janik/release-kit' }}", code)
 
+  def test_title_input_builds_a_describe_message (self):
+    # title must reach the script via env; ${{ }} in run: risks injection.
+    code = '\n'.join (line.partition ('#')[0] for line in
+                      self.workflow.read_text (encoding = 'utf8').splitlines())
+    self.assertIn ('IRCBOT_TITLE: ${{ inputs.title }}', code)
+    self.assertIn ('repository: ${{ github.repository }}', code)
+    self.assertIn ('ref: ${{ github.sha }}', code)
+    self.assertIn ('fetch-depth: 0', code)
+    self.assertIn ('git -C caller-repo describe --always', code)
+    # checkout turns annotated tags into lightweight ones, breaking git describe
+    raw = self.workflow.read_text (encoding = 'utf8')
+    self.assertIn ('git -C caller-repo fetch --force --tags     # Fix actions/checkout#290', raw)
+    self.assertIn ('-D "$GITHUB_REF_NAME"', code)
+    self.assertNotIn ('${{', code[code.index ('run: |'):])
+
 
 if __name__ == '__main__':
   if '--preview' in sys.argv:
