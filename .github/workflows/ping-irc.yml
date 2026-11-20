@@ -54,11 +54,12 @@ jobs:
         IRCBOT_CHANNEL: ${{ inputs.channel }}
         IRCBOT_TITLE: ${{ inputs.title }}
       run: |
-        args=(-s "$IRCBOT_SERVER" -G "$IRCBOT_CHANNEL")
+        args=(-s "$IRCBOT_SERVER" -G) message=()
         if test -n "$IRCBOT_TITLE"; then
           git -C caller-repo fetch --force --tags     # Fix actions/checkout#290
           describe="$(git -C caller-repo describe --always)"
           url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          args+=(-D "$GITHUB_REF_NAME" "$IRCBOT_TITLE $describe - $url")
+          args+=(-D "$GITHUB_REF_NAME") message=("$IRCBOT_TITLE $describe - $url")
         fi
-        ./ircbot.py "${args[@]}"
+        # options go first: argparse before Python 3.12.7 rejects them between positionals
+        ./ircbot.py "${args[@]}" "$IRCBOT_CHANNEL" "${message[@]}"

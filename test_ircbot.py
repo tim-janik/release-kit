@@ -556,6 +556,10 @@ class WorkflowTests (unittest.TestCase):
     raw = self.workflow.read_text (encoding = 'utf8')
     self.assertIn ('git -C caller-repo fetch --force --tags     # Fix actions/checkout#290', raw)
     self.assertIn ('-D "$GITHUB_REF_NAME"', code)
+    self.assertIn ('./ircbot.py "${args[@]}" "$IRCBOT_CHANNEL" "${message[@]}"', code)
+    # Python 3.12.3 on ubuntu-24.04 fails on '-G #chan -D ref msg'
+    args = load_bot().parse_args (['-s', 'irc.example.org', '-G', '-D', 'trunk', '#test', 'Distcheck v1'])
+    self.assertEqual ((args.channel, args.message, args.D), ('#test', ['Distcheck v1'], 'trunk'))
     self.assertNotIn ('${{', code[code.index ('run: |'):])
 
 
