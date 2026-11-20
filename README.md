@@ -11,7 +11,7 @@ and carry no copies, so a kit update needs no per-repository commits.
 | `ircbot.py` | announces CI results on IRC |
 | `test_ircbot.py` | unit tests for `ircbot.py` |
 | `.github/workflows/ping-irc.yml` | reusable Ping-IRC job; callers pass `join(needs.*.result)`, no secrets required |
-| `.github/workflows/ci.yml` | kit CI: runs the test suite on every push to trunk |
+| `.github/workflows/ci.yml` | kit CI: runs the test suite and actionlint on every push to trunk |
 
 ## Consumer wiring
 
