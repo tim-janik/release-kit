@@ -11,7 +11,7 @@ usage()
 Usage: ${ME##*/} [OPTIONS] [COMMITISH]
 
 Check that a repository can release: a make rule builds the release artifacts
-and CI publishes them via .github/workflows/gh-release.sh. Then push a nightly
+and CI publishes them via .github/workflows/release.yml. Then push a nightly
 or release tag, CI creates the GitHub release.
 
 Without options, run all checks and show the nightly and release tag.
