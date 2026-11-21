@@ -67,7 +67,7 @@ run_checks()
     die "missing 'distcheck' or 'dist' target (found: ${RULES:-none})"
 
   echo "  CHECKING  CI release automation: .github/workflows/ci.yml"
-  grep -q 'release-kit/\.github/workflows/release\.yml' .github/workflows/ci.yml 2>/dev/null ||
+  grep -Eq '^[[:space:]]*(-[[:space:]]+)?\{?[[:space:]]*uses:[^#]*release-kit/\.github/workflows/release\.yml' .github/workflows/ci.yml 2>/dev/null ||
     die 'ci.yml does not use release-kit/.github/workflows/release.yml'
 
   echo "  CHECKING  clean working tree"
