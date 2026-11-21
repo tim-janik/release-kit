@@ -16,6 +16,9 @@ jobs:
     steps:
     - { uses: actions/checkout@v7 }
     - run: python3 test_ircbot.py
+    - run: bash release-test.sh
+    - run: bash release-helper-test.sh
+    - run: shellcheck --severity=error -- *.sh
     - name: Actionlint
       run: |
         mkdir -p tmp

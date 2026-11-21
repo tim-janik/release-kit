@@ -1,0 +1,62 @@
+# This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0/
+
+# Reusable Release job: consumers call it from their ci.yml, e.g.
+#      uses: tim-janik/release-kit/.github/workflows/release.yml@trunk
+#      with: { docker-image: 'cimg/go:1.25.14@sha256:...' }
+# The caller's Release job keeps its own `if: github.ref_type == 'tag'`
+# (constrained by on.push.tags) and `needs:`, and must set
+# permissions: { contents: write } so github.token can create the release.
+# The env context is not allowed in a caller's `with:`, so per-repo
+# differences like the docker image or setup commands are inputs.
+
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      docker-image:      # non-empty: build assets inside this docker image
+        default: ''
+        type: string
+      docker-env:        # space separated VAR=VAL items passed into docker
+        default: ''
+        type: string
+      setup:             # bash run in the caller checkout before the release
+        default: ''
+        type: string
+
+jobs:
+  Release:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }  # allow github.token to create a release
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        repository: ${{ github.repository }}  # inside workflow_call: the caller's
+        ref: ${{ github.sha }}
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+        path: caller-repo
+    - run: git -C caller-repo fetch --force --tags     # Fix actions/checkout#290
+    - uses: actions/checkout@v7
+      with:
+        # job.workflow_* identifies this reusable workflow's own source;
+        # github.action_ref would resolve to actions/checkout's ref instead.
+        repository: ${{ job.workflow_repository || 'tim-janik/release-kit' }}
+        ref: ${{ job.workflow_sha || 'trunk' }}  # match the caller's pin
+        persist-credentials: false
+        path: release-kit
+    - name: Release
+      working-directory: caller-repo
+      env:
+        GH_TOKEN: ${{ github.token }}
+        DOCKER_IMAGE: ${{ inputs.docker-image }}
+        DOCKER_ENV: ${{ inputs.docker-env }}
+        RELEASE_SETUP: ${{ inputs.setup }}
+      run: |
+        if test -n "$RELEASE_SETUP"; then
+          eval "$RELEASE_SETUP"
+        fi
+        args=()
+        test -z "$DOCKER_IMAGE" || args+=(--docker)
+        ../release-kit/gh-release.sh --upload "${args[@]}"
